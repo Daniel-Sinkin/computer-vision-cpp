@@ -44,6 +44,7 @@ target_include_directories(cv_playground.o PRIVATE
     ${glfw_SOURCE_DIR}/include
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
+    ${CMAKE_SOURCE_DIR}/external
 )
 
 find_package(OpenGL REQUIRED)
