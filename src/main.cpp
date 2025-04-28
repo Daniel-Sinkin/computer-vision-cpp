@@ -9,6 +9,9 @@
 #include "backends/imgui_impl_opengl3.h"
 #include "imgui.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #include <iostream>
 
 auto setup() -> int {

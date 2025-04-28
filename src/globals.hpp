@@ -9,6 +9,8 @@ struct Constants {
     static constexpr const char *window_title = "Computer Vision";
 
     static constexpr size_t command_buffer_size = 48;
+
+    static constexpr int my_int = 0;
 };
 inline constexpr Constants constants{};
 
