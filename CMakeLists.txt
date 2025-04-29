@@ -4,6 +4,8 @@ project(cv_playground LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_BUILD_TYPE Debug)
+
 include(FetchContent)
 
 # Fetch GLFW
