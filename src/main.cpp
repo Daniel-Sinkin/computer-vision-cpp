@@ -174,7 +174,7 @@ auto main_render_imgui() -> void {
             "Hummingbird Image: Size: %d x %d, Channels: %d",
             globals.hummingbird_image->w(),
             globals.hummingbird_image->h(),
-            globals.hummingbird_image->c());
+            globals.hummingbird_image->get_num_channels());
 
         if (globals.hummingbird_texture != 0) {
             ImGui::Image(
@@ -260,7 +260,7 @@ auto main_loop() -> int {
 
         std::cout << "Loaded hummingbird: "
                   << globals.hummingbird_image->w() << "x" << globals.hummingbird_image->h()
-                  << ", " << globals.hummingbird_image->c() << " channels\n";
+                  << ", " << globals.hummingbird_image->get_num_channels() << " channels\n";
     } catch (const std::exception &exc) {
         std::cerr << "Failed to load image " << image_path << ": " << exc.what() << "\n";
         return EXIT_FAILURE;
@@ -292,83 +292,38 @@ auto main_loop() -> int {
 auto main(int argc, char **argv) -> int {
     // return main_loop();
 
-    xt::xtensor<double, 2> image = {
-        {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
-        {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
-        {0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 90.0, 90.0, 0.0, 0.0},
-        {0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 90.0, 90.0, 0.0, 0.0},
-        {0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 90.0, 90.0, 0.0, 0.0},
-        {0.0, 0.0, 0.0, 90.0, 0.0, 90.0, 90.0, 90.0, 0.0, 0.0},
-        {0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 90.0, 90.0, 0.0, 0.0},
-        {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
-        {0.0, 0.0, 90.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
-        {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+    xt::xtensor<float, 2> image_tensor_flat = {
+        {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 90.0f, 90.0f, 90.0f, 90.0f, 90.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 90.0f, 90.0f, 90.0f, 90.0f, 90.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 90.0f, 90.0f, 90.0f, 90.0f, 90.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 90.0f, 0.0f, 90.0f, 90.0f, 90.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 90.0f, 90.0f, 90.0f, 90.0f, 90.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 90.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
     };
-    xt::xtensor<double, 2> filter = {
-        {1.0, 1.0, 1.0, 1.0, 1.0},
-        {1.0, 1.0, 1.0, 1.0, 1.0},
-        {1.0, 1.0, 1.0, 1.0, 1.0},
-        {1.0, 1.0, 1.0, 1.0, 1.0},
-        {1.0, 1.0, 1.0, 1.0, 1.0},
+    image_tensor_flat /= 255.0;
+    xt::xtensor<float, 3> image_tensor = xt::reshape_view(image_tensor_flat, {10, 10, 1});
+
+    auto image = Image(image_tensor);
+    std::cout << image << "\n";
+
+    xt::xtensor<float, 2> filter = {
+        {1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
     };
     filter /= filter.size();
     std::cout << "Filter:\n"
               << filter << "\n";
-    auto filter_shape = filter.shape();
-    size_t f_offset_y = filter_shape[0] / 2;
-    size_t f_offset_x = filter_shape[1] / 2;
-    size_t window_h = 2 * f_offset_y + 1;
-    size_t window_w = 2 * f_offset_x + 1;
 
-    auto image_shape = image.shape();
-    size_t i_height = image_shape[0];
-    size_t i_width = image_shape[1];
-
-    xt::xtensor<double, 2> filtered_image = xt::zeros<double>({i_height - 2 * f_offset_y, i_width - 2 * f_offset_x});
-    for (size_t y = 0; y < i_height - window_h; ++y) {
-        for (size_t x = 0; x < i_width - window_w; ++x) {
-            auto window = xt::view(
-                image,
-                xt::range(y, y + window_h),
-                xt::range(x, x + window_w));
-            filtered_image(y, x) = xt::sum(window * filter)();
-        }
-    }
+    auto res = image.apply_filter(filter);
     std::cout << "Filtered Image:\n"
-              << filtered_image << "\n";
-
-    auto shape = filtered_image.shape();
-    size_t height = shape[0];
-    size_t width = shape[1];
-
-    // Create a buffer for stb
-    std::vector<unsigned char> buffer;
-    buffer.reserve(width * height);
-
-    // Map double [0.0, 255.0] -> uint8
-    for (size_t y = 0; y < height; ++y) {
-        for (size_t x = 0; x < width; ++x) {
-            double val = 2.55 * filtered_image(y, x);
-            val = std::clamp(val, 0.0, 255.0); // Safety clamp
-            buffer.push_back(static_cast<unsigned char>(val));
-        }
-    }
-
-    // Write to image (e.g., PNG)
-    int success = stbi_write_png(
-        "filtered_image.png",
-        static_cast<int>(width),
-        static_cast<int>(height),
-        1,                      // 1 channel: grayscale
-        buffer.data(),          // Pointer to buffer
-        static_cast<int>(width) // Row stride (bytes per row)
-    );
-
-    if (success) {
-        std::cout << "Image written successfully!\n";
-    } else {
-        std::cerr << "Failed to write image.\n";
-    }
+              << res << "\n";
 
     return 0;
 }
