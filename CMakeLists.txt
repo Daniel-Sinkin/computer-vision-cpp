@@ -72,17 +72,25 @@ add_custom_command(
         ${CMAKE_BINARY_DIR}/data
 )
 
-# Expose include paths for all fetched content
+# === include dirs ===
+# Our own code
 target_include_directories(cv_playground PRIVATE
     ${glad_SOURCE_DIR}/include
     ${glfw_SOURCE_DIR}/include
+)
+
+# Third-party headers as SYSTEM (no warnings from them)
+target_include_directories(cv_playground SYSTEM PRIVATE
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
     ${stb_SOURCE_DIR}
+    ${xtl_SOURCE_DIR}/include
+    ${xtensor_SOURCE_DIR}/include
 )
 
 find_package(OpenGL REQUIRED)
 
+# === warnings: only for our target ===
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   target_compile_options(cv_playground PRIVATE
     -Wall
@@ -116,7 +124,7 @@ target_link_libraries(cv_playground PRIVATE
     xtensor
 )
 
-# ImGui implementation
+# === ImGui implementation ===
 add_library(imgui_impl STATIC
     ${imgui_SOURCE_DIR}/imgui.cpp
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
@@ -126,8 +134,11 @@ add_library(imgui_impl STATIC
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
 )
 
+# ImGui_impl: our code gets warnings, but third-party includes do not
 target_include_directories(imgui_impl PRIVATE
+    ${glfw_SOURCE_DIR}/include
+)
+target_include_directories(imgui_impl SYSTEM PRIVATE
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
-    ${glfw_SOURCE_DIR}/include
 )
