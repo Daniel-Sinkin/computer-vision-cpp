@@ -59,10 +59,8 @@ FetchContent_Declare(
 set(XTENSOR_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(xtensor)
 
-add_executable(cv_playground
-    src/main.cpp
-    src/image.cpp
-)
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
+add_executable(cv_playground ${SOURCES})
 
 # Copy data directory after build
 add_custom_command(
