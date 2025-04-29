@@ -1,6 +1,8 @@
 /* danielsinkin97@gmail.com */
 #define GLFW_INCLUDE_NONE
+
 #include "globals.hpp"
+#include "texture_image.hpp"
 
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
@@ -14,12 +16,11 @@
 #include "stb_image.h"
 #include "stb_image_write.h"
 
+#include <iostream>
 #include <xtensor/containers/xarray.hpp>
 #include <xtensor/containers/xtensor.hpp>
 #include <xtensor/io/xio.hpp>
 #include <xtensor/views/xview.hpp>
-
-#include <iostream>
 
 auto setup() -> int {
     if (glfwInit() == GLFW_FALSE) return false;
@@ -92,6 +93,8 @@ auto bind_image_to_texture(const Image &image) -> GLuint {
 }
 
 auto invert_image() -> void {
+    std::cout << "invert_image currently not implemented!\n";
+    /*
     if (globals.hummingbird_image != nullptr) {
         globals.hummingbird_image->invert();
         if (globals.hummingbird_texture != 0) {
@@ -102,6 +105,7 @@ auto invert_image() -> void {
     } else {
         std::cerr << "Trying to invert, but the image is a nullptr!";
     }
+    */
 }
 
 auto handle_command(const char *command_cstr) -> void {
@@ -168,21 +172,59 @@ auto main_render_imgui() -> void {
     } // Image Modification
 
     if (globals.image_active) { // Image Window
+        /*
+            ImGui::SetNextWindowSize(ImVec2(Constants::image_width + 18.0f, Constants::image_height + 53.0f));
+            ImGui::Begin("Image Viewer", nullptr, ImGuiWindowFlags_NoResize);
+            ImGui::Text(
+                "Hummingbird Image: Size: %d x %d, Channels: %d",
+                globals.hummingbird_image->w(),
+                globals.hummingbird_image->h(),
+                globals.hummingbird_image->get_num_channels());
+
+            if (globals.hummingbird_texture != 0) {
+                ImGui::Image(
+                    reinterpret_cast<void *>(static_cast<intptr_t>(globals.hummingbird_texture)),
+                    ImVec2(Constants::image_width, Constants::image_height));
+            }
+            ImGui::End();
+            */
+    } // Image Window
+
+    { // Hummingbird Image
         ImGui::SetNextWindowSize(ImVec2(Constants::image_width + 18.0f, Constants::image_height + 53.0f));
-        ImGui::Begin("Image Viewer", nullptr, ImGuiWindowFlags_NoResize);
+        ImGui::Begin("Hummingbird 1Image Viewer", nullptr, ImGuiWindowFlags_NoResize);
         ImGui::Text(
             "Hummingbird Image: Size: %d x %d, Channels: %d",
-            globals.hummingbird_image->w(),
-            globals.hummingbird_image->h(),
-            globals.hummingbird_image->get_num_channels());
+            globals.hummingbird.image->w(),
+            globals.hummingbird.image->h(),
+            globals.hummingbird.image->get_num_channels());
 
-        if (globals.hummingbird_texture != 0) {
+        /*TODO: Check this, probably this is the problem. */
+        if (globals.hummingbird.texture != 0) {
             ImGui::Image(
-                reinterpret_cast<void *>(static_cast<intptr_t>(globals.hummingbird_texture)),
+                reinterpret_cast<void *>(static_cast<intptr_t>(globals.hummingbird.texture)),
                 ImVec2(Constants::image_width, Constants::image_height));
         }
         ImGui::End();
-    } // Image Window
+    } // Hummingbird Image
+
+    { // Fennec Image
+        ImGui::SetNextWindowSize(ImVec2(Constants::image_width + 18.0f, Constants::image_height + 53.0f));
+        ImGui::Begin("Fennec Image Viewer", nullptr, ImGuiWindowFlags_NoResize);
+        ImGui::Text(
+            "Fennec Image: Size: %d x %d, Channels: %d",
+            globals.fennec.image->w(),
+            globals.fennec.image->h(),
+            globals.fennec.image->get_num_channels());
+
+        /*TODO: Check this, probably this is the problem. */
+        if (globals.fennec.texture != 0) {
+            ImGui::Image(
+                reinterpret_cast<void *>(static_cast<intptr_t>(globals.fennec.texture)),
+                ImVec2(Constants::image_width, Constants::image_height));
+        }
+        ImGui::End();
+    } // Fennec Image
 
     { // Status Bar
         ImGuiViewport *viewport = ImGui::GetMainViewport();
@@ -253,16 +295,23 @@ auto main_handle_input() -> void {
 auto main_loop() -> int {
     if (setup() != true) return -1;
 
-    std::string image_path = std::string(constants.folder_images) + constants.image_name_hummingbird;
     try {
-        globals.hummingbird_image = std::make_unique<Image>(image_path);
-        globals.hummingbird_texture = bind_image_to_texture(*globals.hummingbird_image);
-
+        globals.hummingbird = TextureImage{std::make_unique<Image>(constants.image_path_hummingbird)};
         std::cout << "Loaded hummingbird: "
-                  << globals.hummingbird_image->w() << "x" << globals.hummingbird_image->h()
-                  << ", " << globals.hummingbird_image->get_num_channels() << " channels\n";
+                  << globals.hummingbird.image->w() << "x" << globals.hummingbird.image->h()
+                  << ", " << globals.hummingbird.image->get_num_channels() << " channels\n";
     } catch (const std::exception &exc) {
-        std::cerr << "Failed to load image " << image_path << ": " << exc.what() << "\n";
+        std::cerr << "Failed to load image " << constants.image_path_hummingbird << ": " << exc.what() << "\n";
+        return EXIT_FAILURE;
+    }
+
+    try {
+        globals.fennec = TextureImage{std::make_unique<Image>(constants.image_path_fennec)};
+        std::cout << "Loaded fennec: "
+                  << globals.fennec.image->w() << "x" << globals.fennec.image->h()
+                  << ", " << globals.fennec.image->get_num_channels() << " channels\n";
+    } catch (const std::exception &exc) {
+        std::cerr << "Failed to load image " << constants.image_path_fennec << ": " << exc.what() << "\n";
         return EXIT_FAILURE;
     }
 
@@ -290,7 +339,7 @@ auto main_loop() -> int {
 }
 
 auto main(int argc, char **argv) -> int {
-    // return main_loop();
+    return main_loop();
 
     xt::xtensor<float, 2> image_tensor_flat = {
         {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},

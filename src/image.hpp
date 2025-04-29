@@ -49,6 +49,8 @@ public:
 
     auto apply_filter(xt::xtensor<float, 2> filter) -> Image;
 
+    auto clip() -> void { data_ = xt::clip(data_, 0.0f, 1.0f); }
+
     xt::xtensor<float, 3> data_;
 
 private:

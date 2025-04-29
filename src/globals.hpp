@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "image.hpp"
+#include "texture_image.hpp"
 
 /* Contains the Constants and static definitions for the project, won't be adjusted at runtime. */
 struct Constants {
@@ -22,8 +23,8 @@ struct Constants {
     static constexpr const char *folder_data = "data/";
     static constexpr const char *folder_images = "data/images/";
 
-    static constexpr const char *image_name_fennec = "fennec.png";
-    static constexpr const char *image_name_hummingbird = "hummingbird.png";
+    static constexpr const char *image_path_fennec = "data/images/fennec.png";
+    static constexpr const char *image_path_hummingbird = "data/images/hummingbird.png";
 
     static constexpr size_t channel_red = 0;
     static constexpr size_t channel_green = 0;
@@ -65,7 +66,7 @@ struct Globals {
 
     bool focus_command_input = true;
 
-    GLuint hummingbird_texture = 0;
-    std::unique_ptr<Image> hummingbird_image;
+    TextureImage hummingbird;
+    TextureImage fennec;
 };
 inline Globals globals;
