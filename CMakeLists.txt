@@ -78,10 +78,33 @@ target_include_directories(cv_playground PRIVATE
     ${glfw_SOURCE_DIR}/include
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
-    ${stb_SOURCE_DIR}            # <- now pulls in stb_image.h, stb_image_write.h, etc.
+    ${stb_SOURCE_DIR}
 )
 
 find_package(OpenGL REQUIRED)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  target_compile_options(cv_playground PRIVATE
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Werror
+    -Wshadow
+    -Wnon-virtual-dtor
+    -Wold-style-cast
+    -Wcast-align
+    -Wconversion
+    -Wsign-conversion
+    -Wnull-dereference
+    -Wdouble-promotion
+    -Wduplicated-cond
+    -Wduplicated-branches
+    -Wlogical-op
+    -Wuseless-cast
+    -Wstrict-overflow=5
+    -Wformat=2
+  )
+endif()
 
 # Link libraries
 target_link_libraries(cv_playground PRIVATE
@@ -108,5 +131,3 @@ target_include_directories(imgui_impl PRIVATE
     ${imgui_SOURCE_DIR}/backends
     ${glfw_SOURCE_DIR}/include
 )
-
-target_link_libraries(cv_playground PRIVATE imgui_impl)
