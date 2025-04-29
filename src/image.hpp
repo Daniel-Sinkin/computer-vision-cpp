@@ -25,6 +25,8 @@ public:
     auto size_bytes() const -> std::size_t;
     auto row_stride() const -> std::size_t;
 
+    auto invert() -> void;
+
 private:
     std::uint8_t *data_ = nullptr;
     int width_ = 0;

@@ -3,6 +3,7 @@
 
 #include "image.hpp"
 
+#include <iostream>
 #include <stdexcept>
 
 Image::Image(const std::string &filename, int force_channels) {
@@ -37,6 +38,22 @@ auto Image::operator=(Image &&other) noexcept -> Image & {
         other.stride_bytes_ = 0;
     }
     return *this;
+}
+
+auto Image::invert() -> void {
+    if (!data_) {
+        std::cerr << "Tried to invert but no image data availiabe!\n";
+        return;
+    }
+    for (int y = 0; y < height_; ++y) {
+        for (int x = 0; x < width_; ++x) {
+            std::uint8_t *pixel = data_ + y * stride_bytes_ + x * channels_;
+
+            for (int c = 0; c < std::min(3, channels_); ++c) {
+                pixel[c] = 255 - pixel[c];
+            }
+        }
+    }
 }
 
 Image::Image(Image &&other) noexcept

@@ -13,6 +13,9 @@ struct Constants {
     static constexpr int window_height = 720;
     static constexpr const char *window_title = "Computer Vision";
 
+    static constexpr float image_width = 512.0f;
+    static constexpr float image_height = 512.0f;
+
     static constexpr size_t command_buffer_size = 48;
 
     static constexpr int my_int = 0;
@@ -48,6 +51,8 @@ struct Globals {
     bool status_bar_version = true;
     bool status_bar_mouse = true;
     bool status_bar_fps = true;
+
+    bool image_active = true;
 
     double mouse_x = 0.0;
     double mouse_y = 0.0;

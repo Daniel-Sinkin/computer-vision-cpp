@@ -62,6 +62,41 @@ auto cleanup() -> void {
     glfwTerminate();
 }
 
+auto bind_image_to_texture(const Image &image) -> GLuint {
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGBA,
+        image.w(),
+        image.h(),
+        0,
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        image.pixels());
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return texture;
+}
+
+auto invert_image() -> void {
+    if (globals.hummingbird_image != nullptr) {
+        globals.hummingbird_image->invert();
+        if (globals.hummingbird_texture != 0) {
+            glDeleteTextures(1, &globals.hummingbird_texture);
+            globals.hummingbird_texture = 0;
+        }
+        globals.hummingbird_texture = bind_image_to_texture(*globals.hummingbird_image);
+    } else {
+        std::cerr << "Trying to invert, but the image is a nullptr!";
+    }
+}
+
 auto ImGui_RightAlignedText(const char *text) -> void {
     float right_align_pos = ImGui::GetWindowWidth() - ImGui::CalcTextSize(text).x - 10.0f;
     ImGui::SameLine(right_align_pos);
@@ -74,15 +109,19 @@ auto handle_command(const char *command) -> void {
     if (strcmp(command, "quit") == 0) {
         glfwSetWindowShouldClose(globals.window, GLFW_TRUE);
     } else if (strcmp(command, "log") == 0) {
-        std::cout << "We would do something like logging here" << "\n";
+        std::cout << "We would do something like logging here\n";
     } else if (strcmp(command, "mouse") == 0) {
-        globals.status_bar_mouse = !globals.status_bar_mouse;
+        globals.status_bar_mouse ^= 1;
     } else if (strcmp(command, "version") == 0) {
-        globals.status_bar_version = !globals.status_bar_version;
+        globals.status_bar_version ^= 1;
     } else if (strcmp(command, "fps") == 0) {
-        globals.status_bar_fps = !globals.status_bar_fps;
+        globals.status_bar_fps ^= 1;
+    } else if (strcmp(command, "image") == 0) {
+        globals.image_active ^= 1;
+    } else if (strcmp(command, "image:invert") == 0) {
+        invert_image();
     } else {
-        std::cerr << "Command is invalid!" << "\n";
+        std::cerr << "Command is invalid!\n";
     }
 }
 
@@ -111,8 +150,15 @@ auto main_render_imgui() -> void {
         ImGui::End();
     } // Display Settings
 
-    { // Image Window
-        ImGui::Begin("Image Viewer");
+    { // Image Modification
+        ImGui::Begin("Image Modification");
+        if (ImGui::Button("Invert")) invert_image();
+        ImGui::End();
+    } // Image Modification
+
+    if (globals.image_active) { // Image Window
+        ImGui::SetNextWindowSize(ImVec2(Constants::image_width + 18.0f, Constants::image_height + 53.0f));
+        ImGui::Begin("Image Viewer", nullptr, ImGuiWindowFlags_NoResize);
         ImGui::Text(
             "Hummingbird Image: Size: %d x %d, Channels: %d",
             globals.hummingbird_image->w(),
@@ -122,7 +168,7 @@ auto main_render_imgui() -> void {
         if (globals.hummingbird_texture != 0) {
             ImGui::Image(
                 reinterpret_cast<void *>(static_cast<intptr_t>(globals.hummingbird_texture)),
-                ImVec2(512.0f, 512.0f));
+                ImVec2(Constants::image_width, Constants::image_height));
         }
         ImGui::End();
     } // Image Window
@@ -191,28 +237,6 @@ auto main_handle_input() -> void {
         globals.focus_command_input = true;
     }
     glfwGetCursorPos(globals.window, &globals.mouse_x, &globals.mouse_y);
-}
-
-auto bind_image_to_texture(const Image &image) -> GLuint {
-    GLuint texture = 0;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-
-    glTexImage2D(
-        GL_TEXTURE_2D,
-        0,
-        GL_RGBA,
-        image.w(),
-        image.h(),
-        0,
-        GL_RGBA,
-        GL_UNSIGNED_BYTE,
-        image.pixels());
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    return texture;
 }
 
 auto main(int argc, char **argv) -> int {
