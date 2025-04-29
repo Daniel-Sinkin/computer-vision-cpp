@@ -8,7 +8,10 @@
 #include "image.hpp"
 #include <cstring>
 #include <stdexcept>
+#include <xtensor/core/xmath.hpp>
 #include <xtensor/generators/xbuilder.hpp>
+
+#include "globals.hpp"
 
 Image::Image(const std::string &filename, int force_channels) {
     stbi_set_flip_vertically_on_load(false);
@@ -33,5 +36,44 @@ auto Image::invert() -> void {
     if (data_.size() == 0) return;
 
     auto rgb = xt::view(data_, xt::all(), xt::all(), xt::range(0, std::min(3, channels_)));
-    rgb = 255 - rgb;
+    rgb = 1.0f - rgb;
+}
+
+auto Image::apply_filter(xt::xtensor<float, 2> filter) -> Image {
+    auto f_shape = filter.shape();
+    size_t f_height = f_shape[0];
+    size_t f_width = f_shape[1];
+
+    size_t f_offset_y = f_height / 2;
+    size_t f_offset_x = f_width / 2;
+
+    size_t filtered_height = h() - 2 * f_offset_y;
+    size_t filtered_width = w() - 2 * f_offset_x;
+    size_t n_channels = get_num_channels();
+
+    xt::xtensor<float, 3> filtered_image = xt::empty<float>({filtered_height, filtered_width, n_channels});
+    if (n_channels == 4) { // No filter on alpha
+        auto src_alpha = xt::view(data_, xt::range(f_offset_y, h() - f_offset_y),
+            xt::range(f_offset_x, w() - f_offset_x),
+            Constants::channel_alpha);
+
+        auto dst_alpha = xt::view(filtered_image, xt::all(), xt::all(), Constants::channel_alpha);
+        dst_alpha = src_alpha;
+    }
+
+    for (size_t c = 0; c < std::min<size_t>(n_channels, 3); ++c) {
+        for (size_t y = 0; y < filtered_height; ++y) {
+            for (size_t x = 0; x < filtered_width; ++x) {
+                // Slice: [y : y + f_height, x : x + f_width]
+                auto slice = xt::view(
+                    data_,
+                    xt::range(y, y + f_height),
+                    xt::range(x, x + f_width),
+                    c);
+                filtered_image.at(y, x, c) = xt::sum(slice * filter)();
+            }
+        }
+    }
+
+    return Image(std::move(filtered_image));
 }
