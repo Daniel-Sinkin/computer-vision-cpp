@@ -9,7 +9,7 @@
 #include "backends/imgui_impl_opengl3.h"
 #include "imgui.h"
 
-#define STB_IMAGE_IMPLEMENTATION
+#include "image.hpp"
 #include "stb_image.h"
 
 #include <iostream>
@@ -75,6 +75,12 @@ auto handle_command(const char *command) -> void {
         glfwSetWindowShouldClose(globals.window, GLFW_TRUE);
     } else if (strcmp(command, "log") == 0) {
         std::cout << "We would do something like logging here" << "\n";
+    } else if (strcmp(command, "mouse") == 0) {
+        globals.status_bar_mouse = !globals.status_bar_mouse;
+    } else if (strcmp(command, "version") == 0) {
+        globals.status_bar_version = !globals.status_bar_version;
+    } else if (strcmp(command, "fps") == 0) {
+        globals.status_bar_fps = !globals.status_bar_fps;
     } else {
         std::cerr << "Command is invalid!" << "\n";
     }
@@ -88,8 +94,39 @@ auto main_render_imgui() -> void {
     { // Display Settings
         ImGui::Begin("Display Settings");
         ImGui::ColorEdit3("Background Color", globals.background_color.rgb());
+        ImGui::ColorEdit3("Dear ImGui Window BG", globals.ui_window_bg_color.rgb());
+        ImGui::ColorEdit3("Dear ImGui Text", globals.ui_text_color.rgb());
+        ImGuiStyle &style = ImGui::GetStyle();
+        style.Colors[ImGuiCol_WindowBg] = ImVec4(
+            globals.ui_window_bg_color.r,
+            globals.ui_window_bg_color.g,
+            globals.ui_window_bg_color.b,
+            globals.ui_window_bg_color.a);
+        style.Colors[ImGuiCol_Text] = ImVec4(
+            globals.ui_text_color.r,
+            globals.ui_text_color.g,
+            globals.ui_text_color.b,
+            globals.ui_text_color.a);
+
         ImGui::End();
     } // Display Settings
+
+    { // Image Window
+        ImGui::Begin("Image Viewer");
+        ImGui::Text(
+            "Hummingbird Image: Size: %d x %d, Channels: %d",
+            globals.hummingbird_image->w(),
+            globals.hummingbird_image->h(),
+            globals.hummingbird_image->c());
+
+        if (globals.hummingbird_texture != 0) {
+            ImGui::Image(
+                reinterpret_cast<void *>(static_cast<intptr_t>(globals.hummingbird_texture)),
+                ImVec2(512.0f, 512.0f));
+        }
+        ImGui::End();
+    } // Image Window
+
     { // Status Bar
         ImGuiViewport *viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + viewport->Size.y - 24));
@@ -103,10 +140,12 @@ auto main_render_imgui() -> void {
             ImGuiWindowFlags_NoSavedSettings;
 
         ImGui::Begin("StatusBar", nullptr, flags);
-        ImGui::Text("%.4f ms/frame (%.1f FPS)",
-            1000.0f / ImGui::GetIO().Framerate,
-            ImGui::GetIO().Framerate);
-        ImGui::SameLine();
+        if (globals.status_bar_fps) {
+            ImGui::Text("%.4f ms/frame (%.1f FPS)",
+                1000.0f / ImGui::GetIO().Framerate,
+                ImGui::GetIO().Framerate);
+            ImGui::SameLine();
+        }
         { // Command Buffer Input
             ImGui::PushItemWidth(400.0f);
             if (globals.focus_command_input) {
@@ -128,14 +167,16 @@ auto main_render_imgui() -> void {
         ImGui::SameLine();
         ImGui::Text("%zu / %zu", strlen(globals.command_buffer), Constants::command_buffer_size);
         ImGui::SameLine();
-        {
+        if (globals.status_bar_mouse) {
             if (glfwGetWindowAttrib(globals.window, GLFW_HOVERED)) {
                 ImGui::Text("Mouse: (%.0f, %.0f)", globals.mouse_x, globals.mouse_y);
             } else {
                 ImGui::Text("Mouse: ");
             }
         }
-        ImGui_RightAlignedText("Version 0.0.alpha");
+        if (globals.status_bar_version) {
+            ImGui_RightAlignedText("Version 0.0.alpha");
+        }
         ImGui::End();
     } // Status Bar
     ImGui::Render();
@@ -152,8 +193,44 @@ auto main_handle_input() -> void {
     glfwGetCursorPos(globals.window, &globals.mouse_x, &globals.mouse_y);
 }
 
+auto bind_image_to_texture(const Image &image) -> GLuint {
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGBA,
+        image.w(),
+        image.h(),
+        0,
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        image.pixels());
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return texture;
+}
+
 auto main(int argc, char **argv) -> int {
     if (setup() != true) return -1;
+
+    std::string image_path = std::string(constants.folder_images) + constants.image_name_hummingbird;
+    try {
+        globals.hummingbird_image = std::make_unique<Image>(image_path);
+        globals.hummingbird_texture = bind_image_to_texture(*globals.hummingbird_image);
+
+        std::cout << "Loaded hummingbird: "
+                  << globals.hummingbird_image->w() << "x" << globals.hummingbird_image->h()
+                  << ", " << globals.hummingbird_image->c() << " channels\n";
+    } catch (const std::exception &exc) {
+        std::cerr << "Failed to load image " << image_path << ": " << exc.what() << "\n";
+        return EXIT_FAILURE;
+    }
+
     while (!glfwWindowShouldClose(globals.window)) {
         main_handle_input();
         main_render_imgui();
