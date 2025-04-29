@@ -8,6 +8,7 @@
 
 #include "image.hpp"
 
+/* Contains the Constants and static definitions for the project, won't be adjusted at runtime. */
 struct Constants {
     static constexpr int window_width = 1280;
     static constexpr int window_height = 720;
@@ -17,8 +18,6 @@ struct Constants {
     static constexpr float image_height = 512.0f;
 
     static constexpr size_t command_buffer_size = 48;
-
-    static constexpr int my_int = 0;
 
     static constexpr const char *folder_data = "data/";
     static constexpr const char *folder_images = "data/images/";
@@ -64,5 +63,4 @@ struct Globals {
     GLuint hummingbird_texture = 0;
     std::unique_ptr<Image> hummingbird_image;
 };
-
 inline Globals globals;
