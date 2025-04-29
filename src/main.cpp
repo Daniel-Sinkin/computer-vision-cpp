@@ -97,32 +97,36 @@ auto invert_image() -> void {
     }
 }
 
+auto handle_command(const char *command_cstr) -> void {
+    using namespace std::literals;
+
+    // clang-format off
+    static const std::unordered_map<std::string_view, std::function<void()>> command_map = {
+        {"quit"sv,           [] { glfwSetWindowShouldClose(globals.window, GLFW_TRUE); }},
+        {"log"sv,            [] { std::cout << "We would do something like logging here\n"; }},
+        {"toggle.mouse"sv,   [] { globals.status_bar_mouse ^= 1; }},
+        {"toggle.version"sv, [] { globals.status_bar_version ^= 1; }},
+        {"toggle.fps"sv,     [] { globals.status_bar_fps ^= 1; }},
+        {"image.toggle"sv,   [] { globals.image_active ^= 1; }},
+        {"image.invert"sv,   [] { invert_image(); }}};
+    // clang-format on
+
+    std::string_view command{command_cstr ? command_cstr : ""};
+    if (command.empty()) return;
+
+    std::cout << "[Command]: " << command << "\n";
+
+    if (auto it = command_map.find(command); it != command_map.end()) {
+        it->second(); // Call the associated function
+    } else {
+        std::cerr << "Command is invalid!\n";
+    }
+}
+
 auto ImGui_RightAlignedText(const char *text) -> void {
     float right_align_pos = ImGui::GetWindowWidth() - ImGui::CalcTextSize(text).x - 10.0f;
     ImGui::SameLine(right_align_pos);
     ImGui::Text("%s", text);
-}
-
-auto handle_command(const char *command) -> void {
-    if (strlen(command) == 0) return;
-    std::cout << "[Command]: " << command << "\n";
-    if (strcmp(command, "quit") == 0) {
-        glfwSetWindowShouldClose(globals.window, GLFW_TRUE);
-    } else if (strcmp(command, "log") == 0) {
-        std::cout << "We would do something like logging here\n";
-    } else if (strcmp(command, "mouse") == 0) {
-        globals.status_bar_mouse ^= 1;
-    } else if (strcmp(command, "version") == 0) {
-        globals.status_bar_version ^= 1;
-    } else if (strcmp(command, "fps") == 0) {
-        globals.status_bar_fps ^= 1;
-    } else if (strcmp(command, "image") == 0) {
-        globals.image_active ^= 1;
-    } else if (strcmp(command, "image:invert") == 0) {
-        invert_image();
-    } else {
-        std::cerr << "Command is invalid!\n";
-    }
 }
 
 auto main_render_imgui() -> void {
