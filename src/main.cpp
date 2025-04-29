@@ -10,7 +10,14 @@
 #include "imgui.h"
 
 #include "image.hpp"
+
 #include "stb_image.h"
+#include "stb_image_write.h"
+
+#include <xtensor/containers/xarray.hpp>
+#include <xtensor/containers/xtensor.hpp>
+#include <xtensor/io/xio.hpp>
+#include <xtensor/views/xview.hpp>
 
 #include <iostream>
 
@@ -243,7 +250,7 @@ auto main_handle_input() -> void {
     glfwGetCursorPos(globals.window, &globals.mouse_x, &globals.mouse_y);
 }
 
-auto main(int argc, char **argv) -> int {
+auto main_loop() -> int {
     if (setup() != true) return -1;
 
     std::string image_path = std::string(constants.folder_images) + constants.image_name_hummingbird;
@@ -265,9 +272,7 @@ auto main(int argc, char **argv) -> int {
 
         int display_w, display_h;
         glfwGetFramebufferSize(globals.window, &display_w, &display_h);
-
         glViewport(0, 0, display_w, display_h);
-
         glClearColor(
             globals.background_color.r,
             globals.background_color.g,
@@ -281,5 +286,89 @@ auto main(int argc, char **argv) -> int {
     }
 
     cleanup();
+    return 0;
+}
+
+auto main(int argc, char **argv) -> int {
+    // return main_loop();
+
+    xt::xtensor<double, 2> image = {
+        {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+        {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+        {0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 90.0, 90.0, 0.0, 0.0},
+        {0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 90.0, 90.0, 0.0, 0.0},
+        {0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 90.0, 90.0, 0.0, 0.0},
+        {0.0, 0.0, 0.0, 90.0, 0.0, 90.0, 90.0, 90.0, 0.0, 0.0},
+        {0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 90.0, 90.0, 0.0, 0.0},
+        {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+        {0.0, 0.0, 90.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+        {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+    };
+    xt::xtensor<double, 2> filter = {
+        {1.0, 1.0, 1.0, 1.0, 1.0},
+        {1.0, 1.0, 1.0, 1.0, 1.0},
+        {1.0, 1.0, 1.0, 1.0, 1.0},
+        {1.0, 1.0, 1.0, 1.0, 1.0},
+        {1.0, 1.0, 1.0, 1.0, 1.0},
+    };
+    filter /= filter.size();
+    std::cout << "Filter:\n"
+              << filter << "\n";
+    auto filter_shape = filter.shape();
+    size_t f_offset_y = filter_shape[0] / 2;
+    size_t f_offset_x = filter_shape[1] / 2;
+    size_t window_h = 2 * f_offset_y + 1;
+    size_t window_w = 2 * f_offset_x + 1;
+
+    auto image_shape = image.shape();
+    size_t i_height = image_shape[0];
+    size_t i_width = image_shape[1];
+
+    xt::xtensor<double, 2> filtered_image = xt::zeros<double>({i_height - 2 * f_offset_y, i_width - 2 * f_offset_x});
+    for (size_t y = 0; y < i_height - window_h; ++y) {
+        for (size_t x = 0; x < i_width - window_w; ++x) {
+            auto window = xt::view(
+                image,
+                xt::range(y, y + window_h),
+                xt::range(x, x + window_w));
+            filtered_image(y, x) = xt::sum(window * filter)();
+        }
+    }
+    std::cout << "Filtered Image:\n"
+              << filtered_image << "\n";
+
+    auto shape = filtered_image.shape();
+    size_t height = shape[0];
+    size_t width = shape[1];
+
+    // Create a buffer for stb
+    std::vector<unsigned char> buffer;
+    buffer.reserve(width * height);
+
+    // Map double [0.0, 255.0] -> uint8
+    for (size_t y = 0; y < height; ++y) {
+        for (size_t x = 0; x < width; ++x) {
+            double val = 2.55 * filtered_image(y, x);
+            val = std::clamp(val, 0.0, 255.0); // Safety clamp
+            buffer.push_back(static_cast<unsigned char>(val));
+        }
+    }
+
+    // Write to image (e.g., PNG)
+    int success = stbi_write_png(
+        "filtered_image.png",
+        static_cast<int>(width),
+        static_cast<int>(height),
+        1,                      // 1 channel: grayscale
+        buffer.data(),          // Pointer to buffer
+        static_cast<int>(width) // Row stride (bytes per row)
+    );
+
+    if (success) {
+        std::cout << "Image written successfully!\n";
+    } else {
+        std::cerr << "Failed to write image.\n";
+    }
+
     return 0;
 }
