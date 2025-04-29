@@ -33,12 +33,38 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(imgui)
 
-# Add executable
+# Fetch stb (single-header libraries)
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG master
+)
+FetchContent_MakeAvailable(stb)
+
+# Fetch xtl (dependency of xtensor)
+FetchContent_Declare(
+    xtl
+    GIT_REPOSITORY https://github.com/xtensor-stack/xtl.git
+    GIT_TAG 0.8.0
+)
+set(XTL_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(xtl)
+
+# Fetch xtensor (header-only)
+FetchContent_Declare(
+    xtensor
+    GIT_REPOSITORY https://github.com/xtensor-stack/xtensor.git
+    GIT_TAG 0.26.0
+)
+set(XTENSOR_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(xtensor)
+
 add_executable(cv_playground
     src/main.cpp
     src/image.cpp
 )
 
+# Copy data directory after build
 add_custom_command(
     TARGET cv_playground POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -46,24 +72,28 @@ add_custom_command(
         ${CMAKE_BINARY_DIR}/data
 )
 
-# Include directories
+# Expose include paths for all fetched content
 target_include_directories(cv_playground PRIVATE
     ${glad_SOURCE_DIR}/include
     ${glfw_SOURCE_DIR}/include
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
-    ${CMAKE_SOURCE_DIR}/external
+    ${stb_SOURCE_DIR}            # <- now pulls in stb_image.h, stb_image_write.h, etc.
 )
 
 find_package(OpenGL REQUIRED)
 
+# Link libraries
 target_link_libraries(cv_playground PRIVATE
     glfw
     glad
     OpenGL::GL
+    imgui_impl
+    xtl
+    xtensor
 )
 
-# Define IMGUI implementation files
+# ImGui implementation
 add_library(imgui_impl STATIC
     ${imgui_SOURCE_DIR}/imgui.cpp
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
