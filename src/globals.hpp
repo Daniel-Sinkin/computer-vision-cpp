@@ -2,6 +2,11 @@
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#include <glad/glad.h>
+
+#include <memory>
+
+#include "image.hpp"
 
 struct Constants {
     static constexpr int window_width = 1280;
@@ -11,6 +16,12 @@ struct Constants {
     static constexpr size_t command_buffer_size = 48;
 
     static constexpr int my_int = 0;
+
+    static constexpr const char *folder_data = "data/";
+    static constexpr const char *folder_images = "data/images/";
+
+    static constexpr const char *image_name_fennec = "fennec.png";
+    static constexpr const char *image_name_hummingbird = "hummingbird.png";
 };
 inline constexpr Constants constants{};
 
@@ -31,12 +42,22 @@ struct Globals {
     GLFWwindow *window = nullptr;
     Color background_color;
 
+    Color ui_window_bg_color = Color{0.06f, 0.06f, 0.06f, 1.0f};
+    Color ui_text_color = Color{1.00f, 1.00f, 1.00f, 1.0f};
+
+    bool status_bar_version = true;
+    bool status_bar_mouse = true;
+    bool status_bar_fps = true;
+
     double mouse_x = 0.0;
     double mouse_y = 0.0;
 
     char command_buffer[Constants::command_buffer_size + 1] = ""; // + 1 for the null terminator
 
     bool focus_command_input = true;
+
+    GLuint hummingbird_texture = 0;
+    std::unique_ptr<Image> hummingbird_image;
 };
 
 inline Globals globals;
