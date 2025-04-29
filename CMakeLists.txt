@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(cv_playground.o LANGUAGES CXX)
+project(cv_playground LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -34,12 +34,20 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(imgui)
 
 # Add executable
-add_executable(cv_playground.o
+add_executable(cv_playground
     src/main.cpp
+    src/image.cpp
+)
+
+add_custom_command(
+    TARGET cv_playground POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/data
+        ${CMAKE_BINARY_DIR}/data
 )
 
 # Include directories
-target_include_directories(cv_playground.o PRIVATE
+target_include_directories(cv_playground PRIVATE
     ${glad_SOURCE_DIR}/include
     ${glfw_SOURCE_DIR}/include
     ${imgui_SOURCE_DIR}
@@ -49,7 +57,7 @@ target_include_directories(cv_playground.o PRIVATE
 
 find_package(OpenGL REQUIRED)
 
-target_link_libraries(cv_playground.o PRIVATE
+target_link_libraries(cv_playground PRIVATE
     glfw
     glad
     OpenGL::GL
@@ -71,4 +79,4 @@ target_include_directories(imgui_impl PRIVATE
     ${glfw_SOURCE_DIR}/include
 )
 
-target_link_libraries(cv_playground.o PRIVATE imgui_impl)
+target_link_libraries(cv_playground PRIVATE imgui_impl)
