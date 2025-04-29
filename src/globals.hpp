@@ -24,6 +24,11 @@ struct Constants {
 
     static constexpr const char *image_name_fennec = "fennec.png";
     static constexpr const char *image_name_hummingbird = "hummingbird.png";
+
+    static constexpr size_t channel_red = 0;
+    static constexpr size_t channel_green = 0;
+    static constexpr size_t channel_blue = 0;
+    static constexpr size_t channel_alpha = 0;
 };
 inline constexpr Constants constants{};
 
