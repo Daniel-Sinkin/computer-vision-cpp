@@ -1,378 +1,107 @@
 /* danielsinkin97@gmail.com */
-#define GLFW_INCLUDE_NONE
 
-#include "globals.hpp"
-#include "texture_image.hpp"
-
-#include <GLFW/glfw3.h>
+// Core system and OpenGL
+#include <SDL.h>
 #include <glad/glad.h>
 
-#include "backends/imgui_impl_glfw.h"
+// ImGui backends
 #include "backends/imgui_impl_opengl3.h"
+#include "backends/imgui_impl_sdl.h"
 #include "imgui.h"
 
-#include "image.hpp"
-
+#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include "stb_image_write.h"
 
+// Standard library
+#include <array>
+#include <assert.h>
+#include <bitset>
+#include <chrono>
+#include <cstdint>
+#include <format>
 #include <iostream>
-#include <xtensor/containers/xarray.hpp>
-#include <xtensor/containers/xtensor.hpp>
-#include <xtensor/io/xio.hpp>
-#include <xtensor/views/xview.hpp>
+#include <thread>
 
-auto setup() -> int {
-    if (glfwInit() == GLFW_FALSE) return false;
+using std::chrono::steady_clock;
+using namespace std::chrono_literals;
 
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-#else
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#endif
+// Project headers
+#include "constants.hpp"
+#include "engine.hpp"
+#include "gl.hpp"
+#include "global.hpp"
+#include "input.hpp"
+#include "log.hpp"
+#include "render.hpp"
+#include "types.hpp"
+#include "utils.hpp"
 
-    globals.window = glfwCreateWindow(
-        Constants::window_width,
-        Constants::window_height,
-        Constants::window_title,
-        nullptr,
-        nullptr);
-    if (globals.window == nullptr) {
-        glfwTerminate();
-        return false;
-    }
-    glfwMakeContextCurrent(globals.window);
-    glfwSwapInterval(1);
+auto main(int argc, char **argv) -> int {
+    LOG_INFO("Application starting");
 
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) return false;
+    if (!engine_setup()) PANIC("Setup failed!");
+    LOG_INFO("Engine setup complete");
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForOpenGL(globals.window, true);
-    ImGui_ImplOpenGL3_Init("#version 410");
+    global.renderer.blit_shader = GL::ShaderProgram();
+    global.renderer.blit_shader.load(
+        Constants::fp_vertex_shader,
+        Constants::fp_fragment_shader);
+    global.renderer.geom_square = GL::create_geometry(Constants::square_vertices, Constants::square_indices);
 
-    return true;
-}
+    stbi_uc *image_data = stbi_load(
+        Constants::fp_image_hummingbird,
+        &global.renderer.image_texture.width,
+        &global.renderer.image_texture.height,
+        &global.renderer.image_texture.channels,
+        STBI_rgb_alpha);
+    if (!image_data) LOG_ERR("Failed to load image {}. (Reason:{})", Constants::fp_image_hummingbird, stbi_failure_reason());
 
-auto cleanup() -> void {
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
-    glfwDestroyWindow(globals.window);
-    glfwTerminate();
-}
+    glGenTextures(1, &global.renderer.image_texture.id);
+    glBindTexture(GL_TEXTURE_2D, global.renderer.image_texture.id);
 
-auto bind_image_to_texture(const Image &image) -> GLuint {
-    GLuint texture = 0;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     glTexImage2D(
         GL_TEXTURE_2D,
         0,
         GL_RGBA,
-        image.w(),
-        image.h(),
+        global.renderer.image_texture.width,
+        global.renderer.image_texture.height,
         0,
         GL_RGBA,
         GL_UNSIGNED_BYTE,
-        image.pixels());
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        image_data);
     glBindTexture(GL_TEXTURE_2D, 0);
-    return texture;
-}
+    stbi_image_free(image_data);
 
-auto invert_image() -> void {
-    std::cout << "invert_image currently not implemented!\n";
-    /*
-    if (globals.hummingbird_image != nullptr) {
-        globals.hummingbird_image->invert();
-        if (globals.hummingbird_texture != 0) {
-            glDeleteTextures(1, &globals.hummingbird_texture);
-            globals.hummingbird_texture = 0;
-        }
-        globals.hummingbird_texture = bind_image_to_texture(*globals.hummingbird_image);
-    } else {
-        std::cerr << "Trying to invert, but the image is a nullptr!";
-    }
-    */
-}
+    global.is_running = true;
+    global.sim.run_start_time = std::chrono::steady_clock::now();
+    global.sim.frame_start_time = global.sim.run_start_time;
+    auto last_instruction_time = std::chrono::steady_clock::now();
+    LOG_INFO("Entering main loop");
+    while (global.is_running) {
+        auto now = std::chrono::steady_clock::now();
+        global.sim.delta_time = now - global.sim.frame_start_time;
+        global.sim.frame_start_time = now;
+        global.sim.total_runtime = now - global.sim.run_start_time;
 
-auto handle_command(const char *command_cstr) -> void {
-    using namespace std::literals;
-
-    // clang-format off
-    static const std::unordered_map<std::string_view, std::function<void()>> command_map = {
-        {"quit"sv,           [] { glfwSetWindowShouldClose(globals.window, GLFW_TRUE); }},
-        {"log"sv,            [] { std::cout << "We would do something like logging here\n"; }},
-        {"toggle.mouse"sv,   [] { globals.status_bar_mouse ^= 1; }},
-        {"toggle.version"sv, [] { globals.status_bar_version ^= 1; }},
-        {"toggle.fps"sv,     [] { globals.status_bar_fps ^= 1; }},
-        {"image.toggle"sv,   [] { globals.image_active ^= 1; }},
-        {"image.invert"sv,   [] { invert_image(); }}};
-    // clang-format on
-
-    std::string_view command{command_cstr ? command_cstr : ""};
-    if (command.empty()) return;
-
-    std::cout << "[Command]: " << command << "\n";
-
-    if (auto it = command_map.find(command); it != command_map.end()) {
-        it->second(); // Call the associated function
-    } else {
-        std::cerr << "Command is invalid!\n";
-    }
-}
-
-auto ImGui_RightAlignedText(const char *text) -> void {
-    float right_align_pos = ImGui::GetWindowWidth() - ImGui::CalcTextSize(text).x - 10.0f;
-    ImGui::SameLine(right_align_pos);
-    ImGui::Text("%s", text);
-}
-
-auto main_render_imgui() -> void {
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    { // Display Settings
-        ImGui::Begin("Display Settings");
-        ImGui::ColorEdit3("Background Color", globals.background_color.rgb());
-        ImGui::ColorEdit3("Dear ImGui Window BG", globals.ui_window_bg_color.rgb());
-        ImGui::ColorEdit3("Dear ImGui Text", globals.ui_text_color.rgb());
-        ImGuiStyle &style = ImGui::GetStyle();
-        style.Colors[ImGuiCol_WindowBg] = ImVec4(
-            globals.ui_window_bg_color.r,
-            globals.ui_window_bg_color.g,
-            globals.ui_window_bg_color.b,
-            globals.ui_window_bg_color.a);
-        style.Colors[ImGuiCol_Text] = ImVec4(
-            globals.ui_text_color.r,
-            globals.ui_text_color.g,
-            globals.ui_text_color.b,
-            globals.ui_text_color.a);
-
-        ImGui::End();
-    } // Display Settings
-
-    { // Image Modification
-        ImGui::Begin("Image Modification");
-        if (ImGui::Button("Invert")) invert_image();
-        ImGui::End();
-    } // Image Modification
-
-    if (globals.image_active) { // Image Window
-        /*
-            ImGui::SetNextWindowSize(ImVec2(Constants::image_width + 18.0f, Constants::image_height + 53.0f));
-            ImGui::Begin("Image Viewer", nullptr, ImGuiWindowFlags_NoResize);
-            ImGui::Text(
-                "Hummingbird Image: Size: %d x %d, Channels: %d",
-                globals.hummingbird_image->w(),
-                globals.hummingbird_image->h(),
-                globals.hummingbird_image->get_num_channels());
-
-            if (globals.hummingbird_texture != 0) {
-                ImGui::Image(
-                    reinterpret_cast<void *>(static_cast<intptr_t>(globals.hummingbird_texture)),
-                    ImVec2(Constants::image_width, Constants::image_height));
-            }
-            ImGui::End();
-            */
-    } // Image Window
-
-    { // Hummingbird Image
-        ImGui::SetNextWindowSize(ImVec2(Constants::image_width + 18.0f, Constants::image_height + 53.0f));
-        ImGui::Begin("Hummingbird 1Image Viewer", nullptr, ImGuiWindowFlags_NoResize);
-        ImGui::Text(
-            "Hummingbird Image: Size: %d x %d, Channels: %d",
-            globals.hummingbird.image->w(),
-            globals.hummingbird.image->h(),
-            globals.hummingbird.image->get_num_channels());
-
-        /*TODO: Check this, probably this is the problem. */
-        if (globals.hummingbird.texture != 0) {
-            ImGui::Image(
-                reinterpret_cast<void *>(static_cast<intptr_t>(globals.hummingbird.texture)),
-                ImVec2(Constants::image_width, Constants::image_height));
-        }
-        ImGui::End();
-    } // Hummingbird Image
-
-    { // Fennec Image
-        ImGui::SetNextWindowSize(ImVec2(Constants::image_width + 18.0f, Constants::image_height + 53.0f));
-        ImGui::Begin("Fennec Image Viewer", nullptr, ImGuiWindowFlags_NoResize);
-        ImGui::Text(
-            "Fennec Image: Size: %d x %d, Channels: %d",
-            globals.fennec.image->w(),
-            globals.fennec.image->h(),
-            globals.fennec.image->get_num_channels());
-
-        /*TODO: Check this, probably this is the problem. */
-        if (globals.fennec.texture != 0) {
-            ImGui::Image(
-                reinterpret_cast<void *>(static_cast<intptr_t>(globals.fennec.texture)),
-                ImVec2(Constants::image_width, Constants::image_height));
-        }
-        ImGui::End();
-    } // Fennec Image
-
-    { // Status Bar
-        ImGuiViewport *viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + viewport->Size.y - 24));
-        ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, 24));
-        ImGui::SetNextWindowBgAlpha(0.5f);
-        ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoTitleBar |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_NoSavedSettings;
-
-        ImGui::Begin("StatusBar", nullptr, flags);
-        if (globals.status_bar_fps) {
-            ImGui::Text("%.4f ms/frame (%.1f FPS)",
-                1000.0f / ImGui::GetIO().Framerate,
-                ImGui::GetIO().Framerate);
-            ImGui::SameLine();
-        }
-        { // Command Buffer Input
-            ImGui::PushItemWidth(400.0f);
-            if (globals.focus_command_input) {
-                ImGui::SetKeyboardFocusHere();
-                globals.focus_command_input = false;
-            }
-            bool command_executed = (ImGui::InputText(
-                "##command_input",
-                globals.command_buffer,
-                IM_ARRAYSIZE(globals.command_buffer),
-                ImGuiInputTextFlags_EnterReturnsTrue));
-            if (command_executed) {
-                handle_command(globals.command_buffer);
-                globals.command_buffer[0] = '\0';
-                globals.focus_command_input = true;
-            }
-            ImGui::PopItemWidth();
-        } // Command Buffer Input
-        ImGui::SameLine();
-        ImGui::Text("%zu / %zu", strlen(globals.command_buffer), Constants::command_buffer_size);
-        ImGui::SameLine();
-        if (globals.status_bar_mouse) {
-            if (glfwGetWindowAttrib(globals.window, GLFW_HOVERED)) {
-                ImGui::Text("Mouse: (%.0f, %.0f)", globals.mouse_x, globals.mouse_y);
-            } else {
-                ImGui::Text("Mouse: ");
-            }
-        }
-        if (globals.status_bar_version) {
-            ImGui_RightAlignedText("Version 0.0.alpha");
-        }
-        ImGui::End();
-    } // Status Bar
-    ImGui::Render();
-};
-
-auto main_handle_input() -> void {
-    glfwPollEvents();
-    if (glfwGetKey(globals.window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        glfwSetWindowShouldClose(globals.window, GLFW_TRUE);
-    }
-    if (glfwGetKey(globals.window, GLFW_KEY_F1) == GLFW_PRESS) {
-        globals.focus_command_input = true;
-    }
-    glfwGetCursorPos(globals.window, &globals.mouse_x, &globals.mouse_y);
-}
-
-auto main_loop() -> int {
-    if (setup() != true) return -1;
-
-    try {
-        globals.hummingbird = TextureImage{std::make_unique<Image>(constants.image_path_hummingbird)};
-        std::cout << "Loaded hummingbird: "
-                  << globals.hummingbird.image->w() << "x" << globals.hummingbird.image->h()
-                  << ", " << globals.hummingbird.image->get_num_channels() << " channels\n";
-    } catch (const std::exception &exc) {
-        std::cerr << "Failed to load image " << constants.image_path_hummingbird << ": " << exc.what() << "\n";
-        return EXIT_FAILURE;
-    }
-
-    try {
-        globals.fennec = TextureImage{std::make_unique<Image>(constants.image_path_fennec)};
-        std::cout << "Loaded fennec: "
-                  << globals.fennec.image->w() << "x" << globals.fennec.image->h()
-                  << ", " << globals.fennec.image->get_num_channels() << " channels\n";
-    } catch (const std::exception &exc) {
-        std::cerr << "Failed to load image " << constants.image_path_fennec << ": " << exc.what() << "\n";
-        return EXIT_FAILURE;
-    }
-
-    while (!glfwWindowShouldClose(globals.window)) {
-        main_handle_input();
-        main_render_imgui();
-
-        int display_w, display_h;
-        glfwGetFramebufferSize(globals.window, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
-        glClearColor(
-            globals.background_color.r,
-            globals.background_color.g,
-            globals.background_color.b,
-            globals.background_color.a);
-        glClear(GL_COLOR_BUFFER_BIT);
+        handle_input();
+        Render::gui_debug();
+        Render::frame();
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        SDL_GL_SwapWindow(global.renderer.window);
 
-        glfwSwapBuffers(globals.window);
+        global.sim.frame_counter += 1;
     }
 
-    cleanup();
-    return 0;
-}
+    LOG_INFO("Main loop exited");
+    engine_cleanup();
+    LOG_INFO("Engine cleanup complete");
+    LOG_INFO("Application exiting successfully");
 
-auto main(int argc, char **argv) -> int {
-    return main_loop();
-
-    xt::xtensor<float, 2> image_tensor_flat = {
-        {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f, 90.0f, 90.0f, 90.0f, 90.0f, 90.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f, 90.0f, 90.0f, 90.0f, 90.0f, 90.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f, 90.0f, 90.0f, 90.0f, 90.0f, 90.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f, 90.0f, 0.0f, 90.0f, 90.0f, 90.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f, 90.0f, 90.0f, 90.0f, 90.0f, 90.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 90.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
-    };
-    image_tensor_flat /= 255.0;
-    xt::xtensor<float, 3> image_tensor = xt::reshape_view(image_tensor_flat, {10, 10, 1});
-
-    auto image = Image(image_tensor);
-    std::cout << image << "\n";
-
-    xt::xtensor<float, 2> filter = {
-        {1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f, 1.0f, 1.0f},
-    };
-    filter /= filter.size();
-    std::cout << "Filter:\n"
-              << filter << "\n";
-
-    auto res = image.apply_filter(filter);
-    std::cout << "Filtered Image:\n"
-              << res << "\n";
-
-    return 0;
+    return EXIT_SUCCESS;
 }
