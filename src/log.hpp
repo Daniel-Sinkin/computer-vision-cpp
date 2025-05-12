@@ -14,7 +14,7 @@ enum class LogLevel {
 };
 
 template <typename... Args>
-inline void log(LogLevel level, std::string_view fmt, Args &&...args) {
+inline auto log(LogLevel level, std::string_view fmt, Args &&...args) -> void {
     std::string msg = std::vformat(fmt, std::make_format_args(args...));
     switch (level) {
     case LogLevel::Info:
@@ -32,7 +32,7 @@ inline void log(LogLevel level, std::string_view fmt, Args &&...args) {
 template <
     typename T,
     typename = std::enable_if_t<!std::is_convertible_v<T, std::string_view>>>
-inline void log(LogLevel level, T &&value) {
+inline auto log(LogLevel level, T &&value) -> void {
     log(level, "{}", std::forward<T>(value));
 }
 
@@ -45,10 +45,10 @@ inline void log(LogLevel level, T &&value) {
  * - msg defaults to empty if not provided.
  * - loc defaults to the *call-site* source_location.
  */
-[[noreturn]] inline void
+[[noreturn]] inline auto
 panic_impl(
     const std::string &msg = {},
-    const std::source_location loc = std::source_location::current()) {
+    const std::source_location loc = std::source_location::current()) -> void {
     // Build the panic message: either with or without a user-provided msg
     std::string full;
     if (msg.empty()) {

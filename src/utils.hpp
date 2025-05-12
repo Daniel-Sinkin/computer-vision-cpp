@@ -55,3 +55,20 @@ format_duration(std::chrono::duration<float> duration) -> std::string {
         hrs, mins, secs, millis);
     return std::string(buffer);
 }
+
+std::vector<Color> convert_stbi_to_c_vec(const stbi_uc *image_data, int width, int height) {
+    std::vector<Color> colors;
+    colors.reserve(width * height);
+
+    for (int i = 0; i < width * height; ++i) {
+        int idx = i * 4;
+
+        Color c;
+        c.r = image_data[idx + 0] / 255.0f;
+        c.g = image_data[idx + 1] / 255.0f;
+        c.b = image_data[idx + 2] / 255.0f;
+        colors.push_back(c);
+    }
+
+    return colors;
+}

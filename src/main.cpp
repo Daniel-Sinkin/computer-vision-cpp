@@ -1,5 +1,8 @@
 /* danielsinkin97@gmail.com */
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 // Core system and OpenGL
 #include <SDL.h>
 #include <glad/glad.h>
@@ -8,9 +11,6 @@
 #include "backends/imgui_impl_opengl3.h"
 #include "backends/imgui_impl_sdl.h"
 #include "imgui.h"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
 
 // Standard library
 #include <array>
@@ -38,7 +38,6 @@ using namespace std::chrono_literals;
 
 auto main(int argc, char **argv) -> int {
     LOG_INFO("Application starting");
-
     if (!engine_setup()) PANIC("Setup failed!");
     LOG_INFO("Engine setup complete");
 
@@ -54,7 +53,10 @@ auto main(int argc, char **argv) -> int {
         &global.renderer.image_texture.height,
         &global.renderer.image_texture.channels,
         STBI_rgb_alpha);
-    if (!image_data) LOG_ERR("Failed to load image {}. (Reason:{})", Constants::fp_image_hummingbird, stbi_failure_reason());
+    if (!image_data) {
+        LOG_ERR("Failed to load image {}. (Reason:{})", Constants::fp_image_hummingbird, stbi_failure_reason());
+        PANIC();
+    }
 
     glGenTextures(1, &global.renderer.image_texture.id);
     glBindTexture(GL_TEXTURE_2D, global.renderer.image_texture.id);
